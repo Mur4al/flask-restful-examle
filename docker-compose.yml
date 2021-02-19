@@ -1,0 +1,31 @@
+version: '3'
+
+services:
+  db:
+    image: postgres:12
+    environment:
+      - POSTGRES_DB=library
+      - POSTGRES_USER=library-user
+      - POSTGRES_PASSWORD=library-password
+    volumes:
+      - data:/var/lib/postgresql/data/
+    ports:
+      - 5432:5432
+  web:
+    build: .
+    command: python main.py
+    environment:
+      DATABASE_URL: postgres://library-user:library-password@db/library
+      SECRET_KEY: secretkey
+      DEBUG: 1
+    volumes:
+      - .:/code
+      - web-media:/code/media/
+    ports:
+      - 8000:8000
+    depends_on:
+      - db
+
+volumes:
+  data:
+  web-media:

@@ -1,0 +1,9 @@
+<!DOCTYPE html>
+<html>
+<body>
+<h1>API list:</h1>
+{% for api in apis %}
+    <div><p>{{ api.name }}: <a href="{{ api.address }}">{{ api.address }}</a></p></div>
+{% endfor %}
+</body>
+</html>
