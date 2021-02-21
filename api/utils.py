@@ -18,7 +18,6 @@ def decode_image(name:str, data64:str, max_length:int)->str:
     filename, ext = os.path.splitext(name)
 
     trunc = max_length - len(upload_folder) - len(name)
-    print(trunc)
     if trunc < 0:
         filename = filename[:trunc]
 

@@ -10,6 +10,11 @@ from api.mixins import ObjectResource, PaginatedListResource, OnlyJsonMixin
 from api.models import Book, Author, User
 from api.utils import decode_image
 
+class MediaField(fields.String):
+    def format(self, value):
+        v = super(MediaField, self).format(value)
+        return f'{request.host_url}{v}'
+
 
 class BaseAuthorResource:
     model = Author
@@ -27,13 +32,12 @@ class BaseAuthorResource:
     fields = {
         'author_id': fields.Integer,
         'name': fields.String,
-        'portrait': fields.String,
+        'portrait': MediaField,
         'books': fields.List(fields.Nested(author_book_fields))
     }
 
 
 class AuthorListResource(BaseAuthorResource, PaginatedListResource):
-
     @jwt_required()
     def post(self):
         args = self.parser.parse_args()
@@ -43,11 +47,9 @@ class AuthorListResource(BaseAuthorResource, PaginatedListResource):
         if portrait_name and portrait:
             author.portrait = decode_image(name=secure_filename(portrait_name), data64=portrait, max_length=255)
         author.save()
-
-        return marshal(author, self.fields, envelope='book'), 200
+        return marshal(author, self.fields, envelope='author_list'), 200
 
     def get_query(self):
-        # переделать в ретурн todo:
         query = super().get_query()
         return query.order_by(self.model.author_id.asc())
 
@@ -58,8 +60,7 @@ class AuthorResource(BaseAuthorResource, ObjectResource):
 
     @jwt_required()
     def put(self, id):
-        self.object_id = id
-        self.get_object()
+        self.get_object(id)
 
         args = self.parser.parse_args()
         portrait_name, portrait = args['portrait_filename'], args['portrait']
@@ -75,7 +76,7 @@ class AuthorResource(BaseAuthorResource, ObjectResource):
 
         if portrait_name and portrait and prev_portrait:
             os.remove(prev_portrait)
-        return marshal(author, self.fields, envelope='book'), 200
+        return marshal(author, self.fields, envelope='author'), 200
 
 
 class BaseBookResource:
@@ -94,7 +95,7 @@ class BaseBookResource:
 
     fields = {
         'book_id': fields.Integer,
-        'cover_image': fields.String,
+        'cover_image': MediaField,
         'name': fields.String,
         'authors': fields.List(fields.Nested(book_author_fields))
     }
@@ -102,9 +103,7 @@ class BaseBookResource:
 
 class BookListResource(BaseBookResource, PaginatedListResource):
 
-    @jwt_required()
     def get(self):
-        print(current_user)
         return super().get()
 
     @jwt_required()
@@ -127,8 +126,7 @@ class BookResource(BaseBookResource, ObjectResource):
 
     @jwt_required()
     def put(self, id):
-        self.object_id = id
-        self.get_object()
+        self.get_object(id)
 
         args = self.parser.parse_args()
         cover_image_name, cover_image = args.get('cover_image_filename'), args['cover_image']
@@ -181,6 +179,14 @@ class RefreshResource(Resource):
 def index():
     user = {'username': 'Murad'}
     apis = [
+        {
+            'address': url_for('login'),
+            'name': 'Get auth token'
+        },
+        {
+            'address': url_for('refresh'),
+            'name': 'Refresh auth token'
+        },
         {
             'address': url_for('book_list'),
             'name': 'Books'
