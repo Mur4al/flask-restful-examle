@@ -1,4 +1,5 @@
 from flask import request
+from flask_jwt_extended import jwt_required
 from flask_restful import marshal, Resource
 
 
@@ -6,7 +7,11 @@ class ListResource(Resource):
     query = None
     model = None
     fields = {}
-    envelope = 'books_list'
+    envelope = None
+
+    def __init__(self):
+        if self.envelope is None:
+            self.envelope = f'{self.model.__name__.lower()}_list'
 
     def get(self):
         self.get_objects()
@@ -28,20 +33,25 @@ class ObjectResource(Resource):
     fields = {}
 
     def get(self, id):
-        self.object_id = id
-        self.get_object()
+        self.get_object(id)
         if self.object is not None:
             result = marshal(self.object, self.fields)
             return result, 200
         else:
             return {}, 404
 
+    @jwt_required()
+    def delete(self, id):
+        self.get_object(id)
+        self.object.delete()
+        return {}, 204
+
     def get_query(self):
         return self.query or self.model.query
 
-    def get_object(self):
+    def get_object(self, id):
         query = self.get_query()
-        self.object = self.query.filter_by(**{self.model_id_field: self.object_id}).one_or_none()
+        self.object = query.filter_by(**{self.model_id_field: id}).one_or_none()
 
 
 class PaginationMixin:
@@ -52,7 +62,6 @@ class PaginationMixin:
     def get_pagination_links(self):
 
         links = {'base': request.base_url, 'total': self.paginator.total}
-        print()
 
         if self.paginator.next_num:
             links = {**links, 'next': f'{request.base_url}?page={self.paginator.next_num}'}
@@ -66,7 +75,7 @@ class PaginationMixin:
         return links
 
     def get_query(self):
-        query =super().get_query()
+        query = super().get_query()
         return query
 
     def get_objects(self):
@@ -84,10 +93,11 @@ class PaginatedListResource(PaginationMixin, ListResource):
         result.move_to_end('links', last=False)
         return result, 200
 
+
 class OnlyJsonMixin:
     def dispatch_request(self, *args, **kwargs):
         if not request.is_json:
-            return {'message':'Only JSON allowed'},400
+            return {'message': 'Only JSON allowed'}, 400
         return super().dispatch_request(*args, **kwargs)
 
 # class AdminAccessMixin:
